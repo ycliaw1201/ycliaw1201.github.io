@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neurology Dual-Phenotype DDx Matrix</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            neuro: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#bae0fd',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom clean scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Grid cell interactive styling */
+    .matrix-cell {
+      position: relative;
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .cell-filled {
+      background-color: #f8fafc;
+      cursor: pointer;
+    }
+    .cell-filled:hover {
+      background-color: #dbeafe !important;
+      transform: scale(1.08);
+      z-index: 25;
+      box-shadow: 0 4px 12px rgba(14, 116, 144, 0.15);
+    }
+    .cell-selected {
+      background-color: #0284c7 !important;
+      color: #ffffff !important;
+      z-index: 30;
+      box-shadow: 0 0 0 3px #38bdf8;
+      transform: scale(1.08);
+    }
+    .cell-selected span {
+      background-color: #ffffff !important;
+    }
+    .cell-search-hit {
+      background-color: #fef08a !important;
+      border: 2px solid #eab308 !important;
+      animation: pulseHighlight 1.8s infinite;
+      z-index: 20;
+    }
+    @keyframes pulseHighlight {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); }
+      50% { transform: scale(1.07); box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.4); }
+    }
+    .cell-diagonal {
+      background-color: #e2e8f0;
+      cursor: not-allowed;
+    }
+    .cell-empty {
+      background-color: #ffffff;
+      color: #cbd5e1;
+    }
+    /* Crosshair highlight lines */
+    .row-highlight {
+      background-color: #eff6ff !important;
+    }
+    .col-highlight {
+      background-color: #eff6ff !important;
+    }
+    .th-highlight {
+      color: #0284c7 !important;
+      background-color: #e0f2fe !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
+
+  <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-sm">
+    <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-md">
+          <i class="fa-solid fa-network-wired text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Neurology Dual-Phenotype Cross-Matrix</h1>
+            <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">Clinical DDx</span>
+          </div>
+          <p class="text-xs text-slate-400">雙重表型神經疾病交叉鑑別診斷系統</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-1 max-w-lg min-w-[280px]">
+        <div class="relative w-full">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search disease, gene, or sign (e.g. Wilson, SCA, CJD, CTX, FXTAS)..."
+            class="w-full pl-9 pr-9 py-2 bg-slate-800/90 text-sm text-slate-100 rounded-lg border border-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+          />
+          <button id="clearSearchBtn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition">
+            <i class="fa-solid fa-circle-xmark text-xs"></i>
+          </button>
+        </div>
+        <div id="searchBadge" class="hidden text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-1 rounded font-mono font-bold whitespace-nowrap">
+          0 hits
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto w-full px-3 sm:px-6 py-4 flex-1 flex flex-col gap-4">
+    
+    <!-- Top Selector Bar & Legend -->
+    <section class="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm">
+        <span class="font-bold text-slate-700 flex items-center gap-1.5">
+          <i class="fa-solid fa-shuffle text-blue-600"></i> Pair Explorer:
+        </span>
+        
+        <div class="flex items-center gap-1.5">
+          <select id="domainSelectA" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <!-- Dynamically populated -->
+          </select>
+          <span class="text-slate-400 font-extrabold text-sm">&times;</span>
+          <select id="domainSelectB" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <!-- Dynamically populated -->
+          </select>
+          <button id="btnInspectPair" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs sm:text-sm transition shadow-sm flex items-center gap-1">
+            <i class="fa-solid fa-crosshairs"></i> Inspect
+          </button>
+        </div>
+      </div>
+
+      <!-- Matrix Legend -->
+      <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+        <span class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded bg-sky-100 border border-sky-400 inline-block"></span> Has Differential
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded bg-amber-200 border border-amber-500 inline-block"></span> Search Hit
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded bg-slate-200 inline-block"></span> Same Domain (Diagonal)
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded bg-blue-600 inline-block"></span> Active Selected
+        </span>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+      
+      <!-- Left: Interactive 2D Matrix (7 Cols on XL) -->
+      <div class="xl:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-table-cells text-blue-600 text-sm"></i>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Clinical Feature Cross-Grid</span>
+          </div>
+          <span class="text-[11px] text-slate-400">Hover across to align &bull; Click to reveal differential</span>
+        </div>
+
+        <div class="overflow-x-auto overflow-y-auto max-h-[660px] p-2" id="matrixWrapper">
+          <table id="matrixTable" class="w-full border-collapse text-left select-none text-[11px]">
+            <!-- Table generated by JS -->
+          </table>
+        </div>
+      </div>
+
+      <!-- Right: Detailed Inspector Panel (5 Cols on XL) -->
+      <div class="xl:col-span-5 flex flex-col gap-3 sticky top-16">
+        
+        <!-- Main Card -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" id="detailCard">
+          
+          <!-- Card Header -->
+          <div class="p-3.5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between border-b border-slate-700">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-400">
+                <i class="fa-solid fa-notes-medical"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 id="inspectorTitle" class="text-sm sm:text-base font-bold text-white tracking-tight">Select a Combination</h2>
+                  <span id="badgeCount" class="hidden px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/30 text-blue-200 border border-blue-400/40"></span>
+                </div>
+                <p id="inspectorSubtitle" class="text-[11px] text-slate-400">Click any valid intersection cell on the matrix</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button id="btnCopyText" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs rounded transition flex items-center gap-1.5" title="Copy text to clipboard">
+                <i class="fa-regular fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
+
+          <!-- Card Content Body -->
+          <div class="p-4 max-h-[580px] overflow-y-auto" id="inspectorBody">
+            <!-- Default Placeholder -->
+            <div class="text-center py-16 text-slate-400 flex flex-col items-center justify-center">
+              <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 mb-3">
+                <i class="fa-solid fa-arrow-pointer text-xl"></i>
+              </div>
+              <p class="text-sm font-semibold text-slate-600">No Phenotype Pair Selected</p>
+              <p class="text-xs text-slate-400 max-w-xs mt-1">Please click on any intersection point in the cross-grid or choose a pair from the top dropdown menu.</p>
+            </div>
+          </div>
+          
+          <!-- Card Footer Status -->
+          <div class="p-2.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
+            <span id="quickSummary">Double-check rare genetic & metabolic mimics</span>
+            <span class="font-mono text-slate-400 text-[10px]">Matrix Reference v2.4</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-xl text-xs flex items-center gap-2 border border-slate-700">
+    <i class="fa-solid fa-circle-check text-green-400"></i>
+    <span id="toastMsg">Action completed</span>
+  </div>
+
+  <script>
+    // Full 15x15 Phenotype Domains
+    const DOMAINS = [
+      "Dementia",
+      "Cranial nerves",
+      "UMN",
+      "Peripheral",
+      "Autonomic",
+      "NMJ",
+      "Muscular",
+      "ABC",
+      "Dystonia",
+      "Myoclonus",
+      "Tremor",
+      "Parkinsonism",
+      "Ataxia",
+      "Seizure",
+      "Multisystem"
+    ];
+
+    // Abbreviated tags for column headers
+    const DOMAIN_SHORT = {
+      "Dementia": "Dem",
+      "Cranial nerves": "CN",
+      "UMN": "UMN",
+      "Peripheral": "PNS",
+      "Autonomic": "ANS",
+      "NMJ": "NMJ",
+      "Muscular": "Myo",
+      "ABC": "ABC",
+      "Dystonia": "Dys",
+      "Myoclonus": "Myoc",
+      "Tremor": "Trem",
+      "Parkinsonism": "Park",
+      "Ataxia": "Atax",
+      "Seizure": "Sz",
+      "Multisystem": "Multi"
+    };
+
+    // Complete symmetric database with expanded SCA, DYT, and subtype numbers
+    const MATRIX_RAW_DATA = {
+      "Dementia": {
+        "Cranial nerves": "HIV, Syphilis, Vascular (Stroke), Superficial siderosis (CN8), Infiltrative disorders, NPC (Gaze, Vertical SNGP), Gaucher (Horizontal SNGP), PSP, SCA2, Whipple Dz",
+        "UMN": "FTD-ALS, CJD, Leukoencephalopathy (X-ALD, Alexander disease, vWM), AD, SCA1, SCA3, SCA7, ARSACS, CTX, LOTS, SPG4",
+        "Peripheral": "Leukodystrophy (MLD, Krabbe, ALD), FTD-ALS, B12 deficiency, Syphilis, HIV, Pb (child and adult), NeuAcan, CTX, Alcohol, Porphyria, Sialidosis, SCA3, Mitochondrial disorders",
+        "Autonomic": "DLB/MSA, AD (late), PDD, CJD variants (FFI), Porphyria, NMDA receptor encephalitis",
+        "NMJ": "--",
+        "Muscular": "Dystrophinopathy (DMD, BMD), Congenital muscular dystrophy (Merosin, POMT, Muscle-Brain-Eye), Dystrophic myotonia (DM1, DM2)",
+        "ABC": "Wilson's disease, HD (HDL), NBIA (PKAN), Paraneoplastic (NMDA), NeuAcan, Lesch-Nyhan, DRPLA, NF",
+        "Dystonia": "Same as Chorea (Wilson's disease, HD, NBIA, NeuAcan, Lesch-Nyhan, DRPLA, NF)",
+        "Myoclonus": "CJD, PME, CBD, PKAN, Paraneoplastic syndromes",
+        "Tremor": "PDD, w/ Cerebellar degeneration",
+        "Parkinsonism": "DLB/PDD/PSP/MSA, VaP (Vascular Parkinsonism), Post-encephalitis, Paraneoplastic, Mn/Mg toxicity, NBIA (PKAN), Wilson's disease, HD, FXTAS, NPC",
+        "Ataxia": "SCA2, SCA7, SCA10, SCA12, SCA17, DRPLA, CJD, NPC, NBIA, B12 deficiency, AOA1, AOA2, FXTAS, Mitochondria, Superficial siderosis, NCL, Alexander's disease, Leukodystrophy, Whipple disease, Wernicke-Korsakoff syndrome",
+        "Seizure": "CJD, DLB, DRPLA, Mitochondrial disorders, GM2 gangliosidosis, SSPE, PME (Lafora body disease, Sialidosis)",
+        "Multisystem": "Syphilis, HIV, Chronic alcoholism"
+      },
+      "Cranial nerves": {
+        "UMN": "Brainstem stroke, Miller Fisher syndrome (MFS)",
+        "Peripheral": "Tangier's disease (Faciobrachial muscular atrophy), SBMA (Kennedy's disease, Bulbar)",
+        "Autonomic": "Wallenberg syndrome (Lateral medullary), Porphyria, Lyme disease, Chemotherapy-induced",
+        "NMJ": "Myasthenia Gravis (MG), Lambert-Eaton Myasthenic Syndrome (LEMS), Botulism",
+        "Muscular": "FSHD (Eye closure, SNHL), OPMD (Oculopharyngeal muscular dystrophy), Mitochondrial disorders (CPEO, PEO, KSS)",
+        "ABC": "Wilson's disease (KF ring), Huntington's disease (Fly-catching tongue), Neuroacanthocytosis, McLeod syndrome (with retinitis pigmentosa)",
+        "Dystonia": "Blepharospasm, Meige's syndrome, NBIA (PKAN, PLAN), ADCY5 (Facial myokymia)",
+        "Myoclonus": "Palatal myoclonus, Brainstem myoclonus, Hemifacial spasm",
+        "Tremor": "Rubral tremor (Holmes tremor, CN3), Palatal tremor (Brainstem lesions)",
+        "Parkinsonism": "PSP (Vertical supranuclear gaze palsy), MSA, Wilson's disease",
+        "Ataxia": "SCA1, SCA2, SCA3 (Ophthalmoplegia), Ataxia-Telangiectasia (AT: Ocular telangiectasia), AOA1, AOA2 (Optic atrophy, Oculomotor apraxia), MFS, PSP, NPC, AVED (Retinitis pigmentosa)"
+      },
+      "UMN": {
+        "Peripheral": "Pure motor: ALS, Complicated HSP (SPG11 = ALS5), FTD-MND\nOthers: B12 deficiency, Copper deficiency, Syphilis, HIV, MFS (Bickerstaff brainstem encephalitis), Sjögren's/SLE, Hypothyroidism, Mitochondrial disorders (NARP, MERRF, MELAS), SCA3, CMT 2A, Friedreich ataxia (FA), FALD, CTX, Leukodystrophy (MLD, Krabbe, Cockayne, AMN)",
+        "Autonomic": "--",
+        "NMJ": "Anti-VGCC paraneoplastic syndromes (?)",
+        "Parkinsonism": "MSA, FTD-ALS, Vascular Parkinsonism (VaP), SLE/Sjögren's, SCA2, SCA3, Complicated HSP, Leukoencephalopathy, CADASIL, Post-encephalitic parkinsonism",
+        "Ataxia": "SCA1, SCA3, SCA7, SCA8, Friedreich ataxia (FRDA), ARSACS, SPAX, Complicated HSP (SPG7), LOTS, CTX, B12 deficiency, Brainstem/Cerebellar stroke, MS, CNS tumor, ALS4 (AOA2), ALS13 (SCA2)"
+      },
+      "Peripheral": {
+        "Muscular": "Paraneoplastic, McLeod, Inclusion Body Myositis (IBM), Sarcoidosis, Mitochondrial neurogastrointestinal encephalomyopathy (MNGIE), LGMD 2B, LGMD 1B, Emery-Dreifuss muscular dystrophy (EDMD), Amyloidosis, Hypothyroidism, Drug toxicity (Vincristine, Colchicine, Chloroquine, Amiodarone), Glycogen debrancher enzyme deficiency",
+        "ABC": "Ataxia-Telangiectasia (AT), AOA1, AOA2",
+        "Dystonia": "Ataxia-Telangiectasia (AT), AOA1, AOA2",
+        "Parkinsonism": "Neuroacanthocytosis, McLeod syndrome, SCA2, SCA3",
+        "Ataxia": "(with Sensory ataxia) Friedreich ataxia (FA), AVED, Abetalipoproteinemia (Abeta), Refsum disease, Sjögren's syndrome, B6 toxicity, AT, AOA1, AOA2, CTX, SCA1, SCA2, SCA3, SCA4, SCA25, Miller Fisher syndrome (MFS), Contactin-1 / NF-155 nodopathy, Alcoholism",
+        "Multisystem": "Fabry's disease (腎心腦皮 = Angiokeratoma, Renal failure, Cardiomyopathy, Early stroke, Painful neuropathy)"
+      },
+      "Autonomic": {
+        "Parkinsonism": "Multiple System Atrophy (MSA), Parkinson's Disease Dementia (PDD), Pure Autonomic Failure (PAF), Dementia with Lewy Bodies (DLB)",
+        "Ataxia": "Multiple System Atrophy - Cerebellar (MSA-C), Fragile X-associated Tremor/Ataxia Syndrome (FXTAS)"
+      },
+      "Muscular": {
+        "Ataxia": "Mitochondrial diseases, Ataxia with Oculomotor Apraxia (AOA), CoQ10 deficiency; Scoliosis & neuromuscular involvement (AOA1, AOA2)"
+      },
+      "ABC": {
+        "Tremor": "Hyperkinetic movement disorders differential",
+        "Parkinsonism": "Huntington's disease (Westphal variant), NBIA, Neuroacanthocytosis",
+        "Ataxia": "SCA17, DRPLA, Ataxia-Telangiectasia (AT), AOA1, AOA2, Huntington's disease (HD)"
+      },
+      "Dystonia": {
+        "Tremor": "Dystonic tremor, Tremor associated with dystonia",
+        "Parkinsonism": "DYT3, DYT5 (DRD), DYT12, PRKRA, ATP1A3, Young-Onset Parkinson's Disease (PINK1, DJ1, PRKN)",
+        "Ataxia": "SCA, DRPLA, Wilson's disease (WD), MSA-C, PSP-C, Neuroacanthocytosis"
+      },
+      "Myoclonus": {
+        "Tremor": "Cortical tremor / Cortical myoclonus mimics",
+        "Parkinsonism": "Corticobasal degeneration (CBD), MSA, CJD, Hepatolenticular degeneration, Wilson's disease",
+        "Ataxia": "CJD, Anti-GAD associated ataxia, Mitochondrial ataxia (POLG mutations), Alexander disease, Progressive Myoclonus Epilepsy 1 (PME1 / Unverricht-Lundborg), SCA7, SCA14, Sialidosis, Ramsay Hunt syndrome type 2, Palatal myoclonus (Alexander disease, SCA20), Whipple's disease, AT, AOA2"
+      },
+      "Tremor": {
+        "Parkinsonism": "Parkinsonian tremor, Essential tremor evolving to PD, Drug-induced parkinsonism, Idiopathic Parkinson's Disease (i-PD)",
+        "Ataxia": "FXTAS (Fragile X tremor/ataxia), SCA12, SCA16, SCA19"
+      },
+      "Parkinsonism": {
+        "Ataxia": "FXTAS, SCA1, SCA2, SCA3, AOA1, AOA2, DRPLA, Multiple System Atrophy (MSA)"
+      },
+      "Ataxia": {
+        "Seizure": "DRPLA, SCA7, SCA10",
+        "Multisystem": "Abetalipoproteinemia (Acanthocytosis, Fat malabsorption), Refsum disease (Retinitis pigmentosa, Sensorineural hearing loss, Anosmia, Renal failure, Ichthyosis), Cerebrotendinous xanthomatosis (CTX: Cataracts, Tendon xanthomas, Atherosclerosis, Osteoporosis, Chronic diarrhea, Hepatic calculi)"
+      }
+    };
+
+    function queryMatrix(r, c) {
+      if (r === c) {
+        return { isDiagonal: true, hasData: false, text: "--", notes: "Same neurological domain" };
+      }
+      if (MATRIX_RAW_DATA[r] && MATRIX_RAW_DATA[r][c] !== undefined) {
+        const txt = MATRIX_RAW_DATA[r][c];
+        return { isDiagonal: false, hasData: txt !== "--" && txt.trim() !== "", text: txt };
+      }
+      if (MATRIX_RAW_DATA[c] && MATRIX_RAW_DATA[c][r] !== undefined) {
+        const txt = MATRIX_RAW_DATA[c][r];
+        return { isDiagonal: false, hasData: txt !== "--" && txt.trim() !== "", text: txt };
+      }
+      return { isDiagonal: false, hasData: false, text: "", notes: "No specific overlapping syndrome tabulated" };
+    }
+
+    const matrixTable = document.getElementById("matrixTable");
+    const domainSelectA = document.getElementById("domainSelectA");
+    const domainSelectB = document.getElementById("domainSelectB");
+    const btnInspectPair = document.getElementById("btnInspectPair");
+    const searchInput = document.getElementById("searchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
+    const searchBadge = document.getElementById("searchBadge");
+    
+    const inspectorTitle = document.getElementById("inspectorTitle");
+    const inspectorSubtitle = document.getElementById("inspectorSubtitle");
+    const badgeCount = document.getElementById("badgeCount");
+    const inspectorBody = document.getElementById("inspectorBody");
+    const quickSummary = document.getElementById("quickSummary");
+    const btnCopyText = document.getElementById("btnCopyText");
+
+    let currentSelectedCell = null;
+    let activePair = { domainA: "Dementia", domainB: "UMN" };
+
+    DOMAINS.forEach((domain) => {
+      const optA = new Option(domain, domain);
+      const optB = new Option(domain, domain);
+      domainSelectA.add(optA);
+      domainSelectB.add(optB);
+    });
+    domainSelectA.value = "Dementia";
+    domainSelectB.value = "UMN";
+
+    function buildMatrixTable() {
+      let thead = `
+        <thead>
+          <tr class="bg-slate-100 border-b border-slate-200">
+            <th class="p-2 border-r border-slate-200 font-bold sticky left-0 bg-slate-100 z-30 min-w-[100px] text-slate-700 shadow-sm">
+              <span class="text-[10px] text-slate-400 block font-mono">Row \\ Col</span>
+              Domain
+            </th>
+      `;
+
+      DOMAINS.forEach((d, cIdx) => {
+        const short = DOMAIN_SHORT[d] || d.slice(0, 4);
+        thead += `
+          <th id="th_col_${cIdx}" class="p-2 border-r border-slate-200 text-center font-bold text-slate-600 min-w-[58px] max-w-[70px] transition-colors" title="${d}">
+            <div class="truncate text-[11px]">${short}</div>
+          </th>
+        `;
+      });
+      thead += `</tr></thead>`;
+
+      let tbody = `<tbody>`;
+      DOMAINS.forEach((rowDomain, rIdx) => {
+        tbody += `
+          <tr id="tr_row_${rIdx}" class="border-b border-slate-100 transition-colors">
+            <th id="th_row_${rIdx}" class="p-2 border-r border-slate-200 font-bold sticky left-0 bg-white z-20 text-slate-700 whitespace-nowrap shadow-sm transition-colors text-left">
+              ${rowDomain}
+            </th>
+        `;
+
+        DOMAINS.forEach((colDomain, cIdx) => {
+          const res = queryMatrix(rowDomain, colDomain);
+          const cellId = `cell_${rIdx}_${cIdx}`;
+
+          let cellClass = "cell-empty";
+          let cellIcon = `<span class="text-slate-200 text-[9px]">&ndash;</span>`;
+
+          if (res.isDiagonal) {
+            cellClass = "cell-diagonal";
+            cellIcon = `<span class="text-slate-400 text-xs">&bull;</span>`;
+          } else if (res.hasData) {
+            cellClass = "cell-filled";
+            cellIcon = `<span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shadow-sm ring-1 ring-blue-300"></span>`;
+          }
+
+          tbody += `
+            <td
+              id="${cellId}"
+              data-r="${rIdx}"
+              data-c="${cIdx}"
+              data-row="${rowDomain}"
+              data-col="${colDomain}"
+              class="matrix-cell p-1.5 border-r border-slate-100 text-center ${cellClass} h-9"
+              title="${rowDomain} &plus; ${colDomain}"
+            >
+              ${cellIcon}
+            </td>
+          `;
+        });
+        tbody += `</tr>`;
+      });
+      tbody += `</tbody>`;
+
+      matrixTable.innerHTML = thead + tbody;
+
+      // Attach cell events
+      DOMAINS.forEach((_, rIdx) => {
+        DOMAINS.forEach((_, cIdx) => {
+          const cell = document.getElementById(`cell_${rIdx}_${cIdx}`);
+          
+          // Hover crosshairs
+          cell.addEventListener("mouseenter", () => highlightCrosshair(rIdx, cIdx, true));
+          cell.addEventListener("mouseleave", () => highlightCrosshair(rIdx, cIdx, false));
+
+          // Selection
+          cell.addEventListener("click", () => {
+            const rowD = cell.getAttribute("data-row");
+            const colD = cell.getAttribute("data-col");
+            selectPair(rowD, colD, cell);
+          });
+        });
+      });
+    }
+
+    function highlightCrosshair(rIdx, cIdx, active) {
+      const rowTh = document.getElementById(`th_row_${rIdx}`);
+      const colTh = document.getElementById(`th_col_${cIdx}`);
+      const rowTr = document.getElementById(`tr_row_${rIdx}`);
+
+      if (active) {
+        if (rowTh) rowTh.classList.add("th-highlight");
+        if (colTh) colTh.classList.add("th-highlight");
+        if (rowTr) rowTr.classList.add("row-highlight");
+      } else {
+        if (rowTh) rowTh.classList.remove("th-highlight");
+        if (colTh) colTh.classList.remove("th-highlight");
+        if (rowTr) rowTr.classList.remove("row-highlight");
+      }
+    }
+
+    function formatInspectorContent(rawText, query = "") {
+      if (!rawText || rawText.trim() === "" || rawText.trim() === "--") {
+        return `
+          <div class="text-center py-12 text-slate-400">
+            <i class="fa-regular fa-folder-open text-3xl mb-2 text-slate-300"></i>
+            <p class="text-sm font-semibold text-slate-600">No Dual Overlap Documented</p>
+            <p class="text-xs text-slate-400 mt-1">These two phenotypes do not have a classical or prominent dual-syndrome overlap listed in this clinical chart.</p>
+          </div>
+        `;
+      }
+
+      // Check if text has sections like "Pure motor:" and "Others:"
+      const lines = rawText.split("\n").map(s => s.trim()).filter(Boolean);
+      let outputHtml = `<div class="space-y-3">`;
+
+      lines.forEach(line => {
+        let isSection = false;
+        let sectionTitle = "";
+        let bodyText = line;
+
+        if (line.includes(":")) {
+          const parts = line.split(/:(.+)/);
+          if (parts[0].length < 25 && !parts[0].includes("(")) {
+            isSection = true;
+            sectionTitle = parts[0];
+            bodyText = parts[1] || "";
+          }
+        }
+
+        // Split conditions by commas or semicolons
+        const diseases = bodyText.split(/[,;]/).map(d => d.trim()).filter(Boolean);
+
+        outputHtml += `
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+            ${isSection ? `
+              <div class="flex items-center gap-1.5 mb-2.5">
+                <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                  ${sectionTitle}
+                </span>
+              </div>
+            ` : ''}
+            
+            <div class="flex flex-wrap gap-1.5">
+        `;
+
+        diseases.forEach(d => {
+          let isRedFlag = false;
+          // Check for prominent entities highlighted in red on original chart
+          if (/NPC|SPG4|FA|FALD|CTX|ALS4|ALS13|MNGIE|LGMD|EDMD|Fabry|Lafora|sialidosis|POLG|Ramsay-Hunt|Sensory ataxia/i.test(d)) {
+            isRedFlag = true;
+          }
+
+          let displayText = d;
+          if (query && query.length > 1) {
+            const regex = new RegExp(`(${query})`, "gi");
+            displayText = displayText.replace(regex, `<mark class="bg-amber-200 text-amber-950 px-0.5 rounded font-bold">$1</mark>`);
+          }
+
+          const badgeStyle = isRedFlag
+            ? "bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100"
+            : "bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300";
+
+          outputHtml += `
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border shadow-2xs transition-colors ${badgeStyle}">
+              ${isRedFlag ? '<i class="fa-solid fa-star text-[10px] text-rose-500"></i>' : '<i class="fa-solid fa-circle-dot text-[8px] text-blue-400"></i>'}
+              <span>${displayText}</span>
+            </span>
+          `;
+        });
+
+        outputHtml += `
+            </div>
+          </div>
+        `;
+      });
+
+      outputHtml += `</div>`;
+      return outputHtml;
+    }
+
+    function selectPair(rowD, colD, targetCell = null) {
+      activePair = { domainA: rowD, domainB: colD };
+
+      // Sync Top Selectors
+      domainSelectA.value = rowD;
+      domainSelectB.value = colD;
+
+      // Update Active Cell Styling
+      if (currentSelectedCell) {
+        currentSelectedCell.classList.remove("cell-selected");
+      }
+
+      if (!targetCell) {
+        const rIdx = DOMAINS.indexOf(rowD);
+        const cIdx = DOMAINS.indexOf(colD);
+        targetCell = document.getElementById(`cell_${rIdx}_${cIdx}`);
+      }
+
+      if (targetCell) {
+        currentSelectedCell = targetCell;
+        currentSelectedCell.classList.add("cell-selected");
+      }
+
+      // Query and Render
+      const result = queryMatrix(rowD, colD);
+      inspectorTitle.innerText = `${rowD} + ${colD}`;
+      inspectorSubtitle.innerText = result.isDiagonal ? "Single-domain boundary" : "Dual-phenotype intersection";
+
+      const query = searchInput.value.trim().toLowerCase();
+      inspectorBody.innerHTML = formatInspectorContent(result.text, query);
+
+      // Disease count pill
+      if (result.hasData) {
+        const count = result.text.split(/[,;\n]/).filter(x => x.trim().length > 1).length;
+        badgeCount.classList.remove("hidden");
+        badgeCount.innerText = `${count} conditions`;
+      } else {
+        badgeCount.classList.add("hidden");
+      }
+
+      quickSummary.innerHTML = `Showing differential overlaps for <strong>${rowD}</strong> &bull; <strong>${colD}</strong>`;
+
+      // Smooth scroll for mobile users
+      if (window.innerWidth < 1280 && targetCell) {
+        document.getElementById("detailCard").scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    btnInspectPair.addEventListener("click", () => {
+      const a = domainSelectA.value;
+      const b = domainSelectB.value;
+      selectPair(a, b);
+    });
+
+    searchInput.addEventListener("input", (e) => {
+      const rawQuery = e.target.value.trim().toLowerCase();
+      const query = rawQuery.replace(/\s+/g, "");
+      
+      if (rawQuery.length > 0) {
+        clearSearchBtn.classList.remove("hidden");
+      } else {
+        clearSearchBtn.classList.add("hidden");
+      }
+
+      let matches = 0;
+
+      DOMAINS.forEach((r, rIdx) => {
+        DOMAINS.forEach((c, cIdx) => {
+          const cell = document.getElementById(`cell_${rIdx}_${cIdx}`);
+          const res = queryMatrix(r, c);
+
+          cell.classList.remove("cell-search-hit");
+
+          if (query.length > 1 && res.hasData) {
+            const normalizedText = res.text.toLowerCase().replace(/\s+/g, "");
+            if (normalizedText.includes(query) || res.text.toLowerCase().includes(rawQuery)) {
+              cell.classList.add("cell-search-hit");
+              matches++;
+            }
+          }
+        });
+      });
+
+      if (query.length > 1) {
+        searchBadge.classList.remove("hidden");
+        searchBadge.innerText = `${matches} hit${matches === 1 ? '' : 's'}`;
+      } else {
+        searchBadge.classList.add("hidden");
+      }
+
+      // Re-render active panel with search highlights
+      const curRes = queryMatrix(activePair.domainA, activePair.domainB);
+      inspectorBody.innerHTML = formatInspectorContent(curRes.text, rawQuery);
+    });
+
+    // Clear search button
+    clearSearchBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      searchInput.dispatchEvent(new Event("input"));
+      searchInput.focus();
+    });
+
+    btnCopyText.addEventListener("click", () => {
+      const res = queryMatrix(activePair.domainA, activePair.domainB);
+      if (!res.hasData) {
+        showToast("No text to copy for this pair");
+        return;
+      }
+
+      const formatted = `=== ${activePair.domainA} + ${activePair.domainB} ===\n${res.text}`;
+      
+      // Resilient clipboard copy
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(formatted).then(() => {
+          showToast("Differential copied to clipboard!");
+        }).catch(() => fallbackCopy(formatted));
+      } else {
+        fallbackCopy(formatted);
+      }
+    });
+
+    function fallbackCopy(text) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      showToast("Differential copied to clipboard!");
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      const toastMsg = document.getElementById("toastMsg");
+      toastMsg.innerText = msg;
+      toast.classList.remove("translate-y-20", "opacity-0");
+      setTimeout(() => {
+        toast.classList.add("translate-y-20", "opacity-0");
+      }, 2000);
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      buildMatrixTable();
+      // Default view: Dementia + UMN
+      selectPair("Dementia", "UMN");
+    });
+  </script>
+</body>
+</html>
